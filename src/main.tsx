@@ -19,6 +19,7 @@ import MyTest from './users/MyTest.tsx';
 import Dashboard from './admin/Dashboard.tsx';
 import Users from './admin/Users.tsx';
 import Courses from './admin/Courses.tsx';
+import CourseForm from './admin/CourseForm.tsx';
 import Organizations from './admin/Organizations.tsx';
 import NotFound from './pages/NotFound.tsx';
 
@@ -99,6 +100,14 @@ const router = createBrowserRouter([
       {
         path: "courses",
         element: <Courses />,
+      },
+      {
+        path: "courses/add",
+        element: <CourseForm />,
+      },
+      {
+        path: "courses/edit/:id",
+        element: <CourseForm />,
       },
       {
         path: "organizations",

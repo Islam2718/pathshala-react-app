@@ -1,126 +1,87 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { supabase } from "../supabaseClient";
+import { getCourseErrorMessage } from "./courseErrors";
+
+type CourseStatus = "Published" | "Draft" | "Archived";
 
 interface Course {
-  id: number;
+  id: string;
   title: string;
   category: string;
   classLevel: string;
   board: string;
+  description: string;
+  subjects: string[];
   lessons: number;
   tests: number;
   students: number;
-  status: "Published" | "Draft" | "Archived";
+  status: CourseStatus;
   updatedAt: string;
 }
 
+async function fetchCourses(): Promise<{ courses: Course[]; error: string | null }> {
+  const { data, error } = await supabase
+    .from("courses")
+    .select("id, title, category, class_level, board, description, subjects, lessons, tests, students, status, updated_at")
+    .order("updated_at", { ascending: false });
+
+  if (error) return { courses: [], error: getCourseErrorMessage(error) };
+  return {
+    courses: data.map((course) => ({
+      id: course.id,
+      title: course.title,
+      category: course.category,
+      classLevel: course.class_level,
+      board: course.board,
+      description: course.description ?? "",
+      subjects: course.subjects ?? [],
+      lessons: course.lessons,
+      tests: course.tests,
+      students: course.students,
+      status: course.status,
+      updatedAt: course.updated_at,
+    })),
+    error: null,
+  };
+}
+
 const Courses = () => {
-  // Demo Data (পরে Supabase থেকে আসবে)
-  const [courses, setCourses] = useState<Course[]>([
-    {
-      id: 1,
-      title: "Pre School Foundation Course",
-      category: "Pre School",
-      classLevel: "Play Group",
-      board: "NCTB",
-      lessons: 48,
-      tests: 12,
-      students: 4200,
-      status: "Published",
-      updatedAt: "2024-06-15",
-    },
-    {
-      id: 2,
-      title: "Class 1-2 Full Syllabus",
-      category: "Primary",
-      classLevel: "Class 1-2",
-      board: "NCTB",
-      lessons: 96,
-      tests: 24,
-      students: 3800,
-      status: "Published",
-      updatedAt: "2024-06-14",
-    },
-    {
-      id: 3,
-      title: "Class 3-5 Math & Science Special",
-      category: "Primary",
-      classLevel: "Class 3-5",
-      board: "NCTB",
-      lessons: 72,
-      tests: 18,
-      students: 2200,
-      status: "Published",
-      updatedAt: "2024-06-13",
-    },
-    {
-      id: 4,
-      title: "Class 6-8 Full Academic Course",
-      category: "Secondary",
-      classLevel: "Class 6-8",
-      board: "NCTB",
-      lessons: 180,
-      tests: 45,
-      students: 9800,
-      status: "Published",
-      updatedAt: "2024-06-12",
-    },
-    {
-      id: 5,
-      title: "SSC Preparation Full Syllabus",
-      category: "Secondary",
-      classLevel: "Class 9-10",
-      board: "NCTB / All Boards",
-      lessons: 240,
-      tests: 60,
-      students: 14500,
-      status: "Published",
-      updatedAt: "2024-06-11",
-    },
-    {
-      id: 6,
-      title: "HSC Science Group Complete",
-      category: "Higher Secondary",
-      classLevel: "Class 11-12",
-      board: "NCTB / All Boards",
-      lessons: 320,
-      tests: 80,
-      students: 11200,
-      status: "Draft",
-      updatedAt: "2024-06-10",
-    },
-    {
-      id: 7,
-      title: "BCS Preliminary Preparation",
-      category: "Job Preparation",
-      classLevel: "Graduate",
-      board: "BPSC Syllabus",
-      lessons: 400,
-      tests: 120,
-      students: 22000,
-      status: "Published",
-      updatedAt: "2024-06-09",
-    },
-    {
-      id: 8,
-      title: "Bank Job Preparation",
-      category: "Job Preparation",
-      classLevel: "Graduate",
-      board: "Bank Recruitment",
-      lessons: 320,
-      tests: 100,
-      students: 18600,
-      status: "Archived",
-      updatedAt: "2024-06-08",
-    },
-  ]);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
   // UI State
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterCategory, setFilterCategory] = useState("all");
-  const [selectedCourses, setSelectedCourses] = useState<number[]>([]);
-  const [showDeleteModal, setShowDeleteModal] = useState<number | null>(null);
+  const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
+  const [showDeleteModal, setShowDeleteModal] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      const result = await fetchCourses();
+      if (!active) return;
+      setCourses(result.courses);
+      setError(result.error ?? "");
+      setLoading(false);
+    };
+    void load();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const retryLoadCourses = async () => {
+    setLoading(true);
+    setError("");
+    const result = await fetchCourses();
+    setCourses(result.courses);
+    setError(result.error ?? "");
+    setLoading(false);
+  };
 
   // Filtered Courses
   const filteredCourses = courses.filter((course) => {
@@ -135,30 +96,58 @@ const Courses = () => {
 
   // Select All / Individual
   const toggleSelectAll = () => {
-    if (selectedCourses.length === filteredCourses.length) {
-      setSelectedCourses([]);
+    const allVisibleSelected =
+      filteredCourses.length > 0 &&
+      filteredCourses.every((course) => selectedCourses.includes(course.id));
+    if (allVisibleSelected) {
+      setSelectedCourses((previous) =>
+        previous.filter((id) => !filteredCourses.some((course) => course.id === id)),
+      );
     } else {
-      setSelectedCourses(filteredCourses.map((c) => c.id));
+      setSelectedCourses((previous) =>
+        Array.from(new Set([...previous, ...filteredCourses.map((course) => course.id)])),
+      );
     }
   };
 
-  const toggleSelect = (id: number) => {
+  const toggleSelect = (id: string) => {
     setSelectedCourses((prev) =>
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
     );
   };
 
   // Delete Handler
-  const handleDelete = (id: number) => {
-    setCourses((prev) => prev.filter((c) => c.id !== id));
-    setSelectedCourses((prev) => prev.filter((i) => i !== id));
+  const handleDelete = async (id: string) => {
+    setDeleting(true);
+    setError("");
+    const { error: deleteError } = await supabase.from("courses").delete().eq("id", id);
+    if (deleteError) {
+      setError(getCourseErrorMessage(deleteError));
+      setDeleting(false);
+      return;
+    }
+    setCourses((prev) => prev.filter((course) => course.id !== id));
+    setSelectedCourses((prev) => prev.filter((selectedId) => selectedId !== id));
     setShowDeleteModal(null);
+    setDeleting(false);
   };
 
   // Bulk Delete
-  const handleBulkDelete = () => {
-    setCourses((prev) => prev.filter((c) => !selectedCourses.includes(c.id)));
+  const handleBulkDelete = async () => {
+    setDeleting(true);
+    setError("");
+    const { error: deleteError } = await supabase
+      .from("courses")
+      .delete()
+      .in("id", selectedCourses);
+    if (deleteError) {
+      setError(getCourseErrorMessage(deleteError));
+      setDeleting(false);
+      return;
+    }
+    setCourses((prev) => prev.filter((course) => !selectedCourses.includes(course.id)));
     setSelectedCourses([]);
+    setDeleting(false);
   };
 
   // Status Badge Color
@@ -195,13 +184,29 @@ const Courses = () => {
         </Link>
       </div>
 
+      {error && (
+        <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+          <span>{error}</span>
+          <button
+            onClick={() => {
+              setLoading(true);
+              setError("");
+              void retryLoadCourses();
+            }}
+            className="font-bold underline"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       {/* ============ STATS CARDS ============ */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: "Total Courses", value: courses.length, color: "from-teal-500 to-teal-600", icon: "📚" },
           { label: "Published", value: courses.filter((c) => c.status === "Published").length, color: "from-green-500 to-green-600", icon: "✅" },
           { label: "Drafts", value: courses.filter((c) => c.status === "Draft").length, color: "from-yellow-500 to-yellow-600", icon: "📝" },
-          { label: "Total Students", value: "86.5k", color: "from-blue-500 to-blue-600", icon: "👨‍🎓" },
+          { label: "Total Students", value: courses.reduce((total, course) => total + course.students, 0).toLocaleString(), color: "from-blue-500 to-blue-600", icon: "👨‍🎓" },
         ].map((stat) => (
           <div key={stat.label} className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
             <div className="flex items-center justify-between">
@@ -287,7 +292,8 @@ const Courses = () => {
                 Clear
               </button>
               <button
-                onClick={handleBulkDelete}
+                onClick={() => void handleBulkDelete()}
+                disabled={deleting}
                 className="text-xs font-bold bg-red-500 hover:bg-red-600 text-white px-3 py-1.5 rounded-lg"
               >
                 Delete Selected
@@ -307,7 +313,7 @@ const Courses = () => {
                 <th className="px-4 md:px-6 py-4 w-12">
                   <input
                     type="checkbox"
-                    checked={selectedCourses.length === filteredCourses.length && filteredCourses.length > 0}
+                    checked={filteredCourses.length > 0 && filteredCourses.every((course) => selectedCourses.includes(course.id))}
                     onChange={toggleSelectAll}
                     className="w-4 h-4 rounded accent-brandTeal cursor-pointer"
                   />
@@ -334,6 +340,13 @@ const Courses = () => {
             </thead>
 
             <tbody className="divide-y divide-slate-100">
+              {loading && (
+                <tr>
+                  <td colSpan={7} className="px-6 py-12 text-center font-semibold text-slate-500">
+                    Loading courses...
+                  </td>
+                </tr>
+              )}
               {filteredCourses.map((course) => (
                 <tr key={course.id} className="hover:bg-slate-50 transition group">
                   {/* Checkbox */}
@@ -358,6 +371,19 @@ const Courses = () => {
                       <p className="text-xs text-slate-400 font-medium mt-0.5 hidden md:block">
                         {course.board} • {course.classLevel}
                       </p>
+                      {course.description && (
+                        <p
+                          className="mt-1 max-w-sm truncate text-xs font-medium text-slate-500"
+                          title={course.description}
+                        >
+                          {course.description}
+                        </p>
+                      )}
+                      {course.subjects.length > 0 && (
+                        <p className="mt-1 text-xs font-medium text-slate-400">
+                          Subjects: {course.subjects.join(", ")}
+                        </p>
+                      )}
                     </div>
                   </td>
 
@@ -435,7 +461,7 @@ const Courses = () => {
         </div>
 
         {/* Empty State */}
-        {filteredCourses.length === 0 && (
+        {!loading && !error && filteredCourses.length === 0 && (
           <div className="py-16 text-center">
             <div className="w-16 h-16 mx-auto bg-slate-100 rounded-full flex items-center justify-center mb-4">
               <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
@@ -479,15 +505,17 @@ const Courses = () => {
             <div className="flex gap-3">
               <button
                 onClick={() => setShowDeleteModal(null)}
+                disabled={deleting}
                 className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl transition"
               >
                 Cancel
               </button>
               <button
-                onClick={() => handleDelete(showDeleteModal)}
+                onClick={() => void handleDelete(showDeleteModal)}
+                disabled={deleting}
                 className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-2.5 rounded-xl transition"
               >
-                Delete
+                {deleting ? "Deleting..." : "Delete"}
               </button>
             </div>
           </div>

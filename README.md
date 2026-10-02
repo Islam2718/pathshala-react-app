@@ -187,7 +187,20 @@ The current app still has demo data and mocked presentation values. For producti
 
 Use Supabase database tables and row-level security policies for real app state.
 
-### 3. Standardize reusable UI patterns
+### 3. Course management with Supabase
+
+The admin course list and course create/edit form use the Supabase `courses` table with `title`, `category`, `class_level`, `board`, `description`, `subjects` (`text[]`), `lessons`, `tests`, `students`, `status`, and `updated_at` columns.
+To enable them in a new Supabase project:
+
+1. Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` to `.env.local` as shown above, then restart the Vite dev server.
+2. In the Supabase SQL Editor, open and run [`supabase/migrations/20261002000000_create_courses.sql`](./supabase/migrations/20261002000000_create_courses.sql). This creates `public.courses`, applies the example RLS policies, and requests a PostgREST schema-cache reload. If the Supabase CLI is configured for this project, the same migration can be applied with `supabase db push`.
+
+3. Make sure `.env.local` points to this same Supabase project, restart the Vite dev server, sign in, and open `/admin/courses`. New records start with a student count of zero; enrolled-student counts should later be derived from an enrollments table rather than edited on this form.
+4. Use the edit action to update an existing record. The course list refreshes from the table and supports filtering, single-course deletion, and bulk deletion.
+
+These example RLS policies allow any authenticated user to manage courses. The admin routes require a Supabase sign-in so anonymous requests are not sent to the protected table. The current app does not yet implement admin role authorization; before production, replace these policies with checks against a trusted admin role. Never put a Supabase service-role key in the Vite app.
+
+### 4. Standardize reusable UI patterns
 
 The app currently contains several repeated UI patterns. Next steps:
 
@@ -197,7 +210,7 @@ The app currently contains several repeated UI patterns. Next steps:
 
 This will make the project easier to scale and maintain.
 
-### 4. Build a real user dashboard
+### 5. Build a real user dashboard
 
 The admin and user pages should evolve from placeholder components into real dashboards:
 
@@ -209,7 +222,7 @@ The admin and user pages should evolve from placeholder components into real das
 
 Use components from a dashboard library or build a consistent internal design system.
 
-### 5. Add stronger form validation
+### 6. Add stronger form validation
 
 Current forms work, but they can be improved with:
 
@@ -220,7 +233,7 @@ Current forms work, but they can be improved with:
 - inline error highlighting
 - form-level loading states
 
-### 6. Expand i18n coverage
+### 7. Expand i18n coverage
 
 Right now, the app handles core landing-page and navigation text. Next step is to translate all visible labels and dynamic content across:
 
@@ -230,7 +243,7 @@ Right now, the app handles core landing-page and navigation text. Next step is t
 - dashboard content
 - error/success notifications
 
-### 7. Optimize code organization
+### 8. Optimize code organization
 
 For future growth, consider separating functionality into clear domains:
 
@@ -243,7 +256,7 @@ For future growth, consider separating functionality into clear domains:
 
 This will keep the project clean and easier to maintain as more features are added.
 
-### 8. Production hardening
+### 9. Production hardening
 
 Before deploying to production, plan for:
 
@@ -311,4 +324,3 @@ If you are continuing development, the next most important tasks are:
 - connect user data to Supabase tables
 - create a real dashboard and course management workflow
 - migrate all demo content to live backend data
-
