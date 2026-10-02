@@ -2,10 +2,12 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
+import './i18n';
 
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 
 import Home from './pages/Home.tsx';
+import Course from './pages/Course.tsx';
 import About from './pages/About.tsx';
 import Login from './pages/Login.tsx';
 import Signup from './pages/Signup.tsx';
@@ -32,6 +34,10 @@ const router = createBrowserRouter([
       {
         path: "/home",
         element: <Home />,
+      },
+      {
+        path: "/courses",
+        element: <Course />,
       },
       {
         path: "/about",
