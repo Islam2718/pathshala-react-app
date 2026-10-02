@@ -1,8 +1,8 @@
 function NotFound() {
-    const projectName = 'Pathshala App - 404 Page';
+    const projectName = '404 Not Found !';
     return (
         <>
-            <h1>Welcome to {projectName}</h1>
+            <h1>{projectName}</h1>
         </>
     )
 }

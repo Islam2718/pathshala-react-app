@@ -22,6 +22,9 @@ import Courses from './admin/Courses.tsx';
 import Organizations from './admin/Organizations.tsx';
 import NotFound from './pages/NotFound.tsx';
 
+// Admin Layout (Sidebar + Topbar এর জন্য)
+import AdminLayout from './admin/AdminLayout.tsx';
+
 const router = createBrowserRouter([
   {
     path: "/",
@@ -72,20 +75,34 @@ const router = createBrowserRouter([
         element: <MyTest />
       },
       {
-        path: "/admin/dashboard",
-        element: <Dashboard />
+        path: "*",
+        element: <NotFound />
+      }
+    ]
+  },
+  {
+    path: "/admin",
+    element: <AdminLayout />,
+    children: [
+      {
+        index: true,
+        element: <Dashboard />,
       },
       {
-        path: "/admin/users",
-        element: <Users />
+        path: "dashboard",
+        element: <Dashboard />,
       },
       {
-        path: "/admin/courses",
-        element: <Courses />
+        path: "users",
+        element: <Users />,
       },
       {
-        path: "/admin/organizations",
-        element: <Organizations />
+        path: "courses",
+        element: <Courses />,
+      },
+      {
+        path: "organizations",
+        element: <Organizations />,
       },
       {
         path: "*",
@@ -97,7 +114,6 @@ const router = createBrowserRouter([
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    {/* <App /> */}
     <RouterProvider router={router} />
   </StrictMode>,
 )
