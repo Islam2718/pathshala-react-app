@@ -20,6 +20,9 @@ import Dashboard from './admin/Dashboard.tsx';
 import Users from './admin/Users.tsx';
 import Courses from './admin/Courses.tsx';
 import CourseForm from './admin/CourseForm.tsx';
+import CourseLessons from './admin/CourseLessons.tsx';
+import LessonMcqTest from './admin/LessonMcqTest.tsx';
+import CourseCategories from './admin/CourseCategories.tsx';
 import Organizations from './admin/Organizations.tsx';
 import NotFound from './pages/NotFound.tsx';
 
@@ -108,6 +111,18 @@ const router = createBrowserRouter([
       {
         path: "courses/edit/:id",
         element: <CourseForm />,
+      },
+      {
+        path: "courses/:courseId/lessons",
+        element: <CourseLessons />,
+      },
+      {
+        path: "courses/:courseId/lessons/:lessonId/test",
+        element: <LessonMcqTest />,
+      },
+      {
+        path: "course-categories",
+        element: <CourseCategories />,
       },
       {
         path: "organizations",

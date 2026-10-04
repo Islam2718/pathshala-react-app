@@ -6,7 +6,7 @@ A modern React + TypeScript + Vite educational platform with Supabase authentica
 
 This project is structured as a learning platform for students, teachers, and schools. It currently includes:
 
-- landing page and course showcase
+- landing page and Supabase-backed course catalog
 - Supabase-based login and signup
 - auth state tracking using a custom hook
 - i18n support for English and Bangla
@@ -57,6 +57,8 @@ src/
     Dashboard.tsx
     Users.tsx
     Courses.tsx
+    CourseForm.tsx
+    CourseCategories.tsx
     Organizations.tsx
   locales/
     en.json
@@ -103,6 +105,13 @@ The language detector saves user preference in local storage and reloads it auto
 - `/users/...` user pages
 - `/admin/...` admin pages
 - `*` NotFound
+
+Course administration routes:
+
+- `/admin/courses` — browse, filter, and delete courses
+- `/admin/courses/add` — create a course
+- `/admin/courses/edit/:id` — edit a course
+- `/admin/course-categories` — create, edit, activate/deactivate, and delete course categories
 
 ### 4. Global Layout
 
@@ -187,18 +196,41 @@ The current app still has demo data and mocked presentation values. For producti
 
 Use Supabase database tables and row-level security policies for real app state.
 
-### 3. Course management with Supabase
+### 3. Course catalog and management with Supabase
 
-The admin course list and course create/edit form use the Supabase `courses` table with `title`, `category`, `class_level`, `board`, `description`, `subjects` (`text[]`), `lessons`, `tests`, `students`, `status`, and `updated_at` columns.
-To enable them in a new Supabase project:
+The home page and `/courses` page share a live catalog component. It shows published courses and dynamically generated filters for active categories. Admins manage courses and categories from the protected admin area.
+
+The database contains:
+
+- `public.courses`: `title`, `category`, `class_level`, `board`, `description`, `subjects` (`text[]`), `lessons`, `tests`, `students`, `status`, and `updated_at`
+- `public.course_categories`: unique `name` and `slug`, optional `description`, `is_active`, and `created_at`
+- a foreign key from `courses.category` to `course_categories.name`; category rename updates matching course rows, and deleting a category in use is blocked
+
+To enable the complete catalog in a Supabase project:
 
 1. Add `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` to `.env.local` as shown above, then restart the Vite dev server.
-2. In the Supabase SQL Editor, open and run [`supabase/migrations/20261002000000_create_courses.sql`](./supabase/migrations/20261002000000_create_courses.sql). This creates `public.courses`, applies the example RLS policies, and requests a PostgREST schema-cache reload. If the Supabase CLI is configured for this project, the same migration can be applied with `supabase db push`.
+2. In the Supabase SQL Editor for that same project, apply the migrations in order: start with [`supabase/migrations/20261002000000_create_courses.sql`](./supabase/migrations/20261002000000_create_courses.sql), then the follow-up PicoLearn migration files in the same folder (`20261004000001_create_profiles.sql` through `20261004000011_create_lesson_mcq_tests.sql`). The base migration creates or updates the course catalog tables, and the follow-up files add profiles, organizations, classes, exams, RLS, the organization RLS recursion fix, admin lesson management, and lesson MCQ tests. If the Supabase CLI is configured for the project, apply them with `supabase db push`.
+3. Start the app with `npm run dev`, sign in, and open `/admin/course-categories` to add the categories you want to use. Existing distinct course category values are seeded into this table when the migration runs.
+4. Open `/admin/courses/add` to create a course. Choose its category from the managed category list; new courses start with zero students. Use the edit action to update a course or the delete action to remove it.
+5. Open a course's **Lessons** action to create, edit, order, and publish its lessons. Lessons are only visible to the public when both the lesson and its course are published.
+6. Use a lesson's **MCQ test** action to optionally add a test, set its title/published status, create questions with 2–6 answer options, and mark exactly one correct answer per question.
+7. Publish a course by setting its status to `Published`. It will then appear in the home-page section and `/courses`, grouped by its active category. Draft and archived courses remain in admin only.
 
-3. Make sure `.env.local` points to this same Supabase project, restart the Vite dev server, sign in, and open `/admin/courses`. New records start with a student count of zero; enrolled-student counts should later be derived from an enrollments table rather than edited on this form.
-4. Use the edit action to update an existing record. The course list refreshes from the table and supports filtering, single-course deletion, and bulk deletion.
+Public catalog access is read-only and limited to published courses and active categories. Admin write policies currently allow any authenticated user because the app does not yet have admin-role authorization. Before production, restrict course/category write policies to a trusted admin role and enforce authorization server-side. Never put a Supabase service-role key in the Vite app.
 
-These example RLS policies allow any authenticated user to manage courses. The admin routes require a Supabase sign-in so anonymous requests are not sent to the protected table. The current app does not yet implement admin role authorization; before production, replace these policies with checks against a trusted admin role. Never put a Supabase service-role key in the Vite app.
+#### Troubleshooting course RLS errors
+
+Course and category writes verify the current Supabase user before sending mutations. If Supabase still reports a row-level security error, inspect the policies in the same project as `VITE_SUPABASE_URL`:
+
+```sql
+select schemaname, tablename, policyname, permissive, roles, cmd, qual, with_check
+from pg_policies
+where schemaname = 'public'
+  and tablename in ('courses', 'course_categories')
+order by tablename, policyname;
+```
+
+For the current signed-in admin model, `courses` and `course_categories` need permissive `INSERT`, `UPDATE`, and `DELETE` policies for the `authenticated` role. A restrictive policy can still deny a request even when these permissive policies exist. Re-run the latest course migration to recreate the project policies, and remove/adjust any custom restrictive policy that disallows the intended admin writes. Do not enable anonymous writes or put the service-role key in the browser.
 
 ### 4. Standardize reusable UI patterns
 
@@ -280,7 +312,7 @@ Before deploying to production, plan for:
 
 ### Phase 2 - Product features
 
-- implement course listing and detail pages
+- add course detail pages and enrollment flows
 - add student enrollments and progress tracking
 - implement admin dashboard analytics
 - add payments and billing flow

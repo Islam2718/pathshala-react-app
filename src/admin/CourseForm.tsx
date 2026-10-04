@@ -4,6 +4,7 @@ import { supabase } from "../supabaseClient";
 import { getCourseErrorMessage } from "./courseErrors";
 
 type CourseStatus = "Published" | "Draft" | "Archived";
+type CourseCategory = { name: string; isActive: boolean };
 
 type CourseValues = {
   title: string;
@@ -37,10 +38,36 @@ function CourseForm() {
   const navigate = useNavigate();
   const isEditing = Boolean(id);
   const [values, setValues] = useState<CourseValues>(emptyCourse);
+  const [categories, setCategories] = useState<CourseCategory[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [loading, setLoading] = useState(isEditing);
   const [courseLoaded, setCourseLoaded] = useState(!isEditing);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    const loadCategories = async () => {
+      const { data, error: categoryError } = await supabase
+        .from("course_categories")
+        .select("name, is_active")
+        .order("name");
+      if (!active) return;
+      if (categoryError) {
+        setError(getCourseErrorMessage(categoryError));
+      } else {
+        setCategories(data.map((category) => ({
+          name: category.name,
+          isActive: category.is_active,
+        })));
+      }
+      setCategoriesLoading(false);
+    };
+    void loadCategories();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -92,6 +119,16 @@ function CourseForm() {
     event.preventDefault();
     setError("");
     setSaving(true);
+    const { data: authData, error: authLookupError } = await supabase.auth.getUser();
+    if (authLookupError || !authData.user) {
+      setError(
+        authLookupError
+          ? `Could not verify your Supabase sign-in: ${authLookupError.message}`
+          : "Your Supabase session has expired. Sign in again, then retry.",
+      );
+      setSaving(false);
+      return;
+    }
 
     const course = {
       title: values.title.trim(),
@@ -106,15 +143,20 @@ function CourseForm() {
       lessons: Number(values.lessons),
       tests: Number(values.tests),
       status: values.status,
+      is_published: values.status === "Published",
       updated_at: new Date().toISOString().slice(0, 10),
     };
 
     const result = id
       ? await supabase.from("courses").update(course).eq("id", id).select("id").single()
-      : await supabase.from("courses").insert({ ...course, students: 0 }).select("id").single();
+      : await supabase.from("courses").insert({
+          ...course,
+          created_by: authData.user.id,
+          students: 0,
+        }).select("id").single();
 
     if (result.error) {
-      setError(getCourseErrorMessage(result.error));
+      setError(getCourseErrorMessage(result.error, "public.courses"));
       setSaving(false);
       return;
     }
@@ -167,14 +209,28 @@ function CourseForm() {
 
           <label className="text-sm font-bold text-slate-700">
             Category
-            <input
+            <select
               className={fieldClassName}
               value={values.category}
               onChange={(event) => updateField("category", event.target.value)}
               required
-              maxLength={80}
-              placeholder="e.g. Primary"
-            />
+              disabled={categoriesLoading || categories.length === 0}
+            >
+              <option value="">Select a category</option>
+              {categories.map((category) => (
+                <option key={category.name} value={category.name}>
+                  {category.name}{category.isActive ? "" : " (Inactive)"}
+                </option>
+              ))}
+            </select>
+            {categories.length === 0 && !categoriesLoading && (
+              <span className="mt-1 block font-normal text-amber-700">
+                Add a category before creating a course.{" "}
+                <Link to="/admin/course-categories" className="font-bold underline">
+                  Manage categories
+                </Link>
+              </span>
+            )}
           </label>
 
           <label className="text-sm font-bold text-slate-700">
@@ -275,7 +331,7 @@ function CourseForm() {
           </Link>
           <button
             type="submit"
-            disabled={saving || !courseLoaded}
+            disabled={saving || !courseLoaded || categoriesLoading || categories.length === 0}
             className="rounded-xl bg-brandTeal px-6 py-3 text-sm font-bold text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {saving ? "Saving..." : isEditing ? "Save changes" : "Create course"}

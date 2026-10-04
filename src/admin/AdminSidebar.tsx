@@ -4,6 +4,7 @@ const menuItems = [
   { label: "Dashboard", path: "/admin/dashboard", icon: "📊" },
   { label: "Users", path: "/admin/users", icon: "👥" },
   { label: "Courses", path: "/admin/courses", icon: "📚" },
+  { label: "Course Categories", path: "/admin/course-categories", icon: "🏷️" },
   { label: "Organizations", path: "/admin/organizations", icon: "🏢" },
 ];
 
@@ -47,7 +48,10 @@ export default function AdminSidebar({ sidebarOpen, setSidebarOpen }: AdminSideb
 
         <nav className="space-y-2 p-4">
           {menuItems.map((item) => {
-            const isActive = location.pathname === item.path || (item.path === "/admin/dashboard" && location.pathname === "/admin");
+            const isActive =
+              location.pathname === item.path ||
+              location.pathname.startsWith(`${item.path}/`) ||
+              (item.path === "/admin/dashboard" && location.pathname === "/admin");
 
             return (
               <Link

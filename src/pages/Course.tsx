@@ -1,9 +1,11 @@
-function Course(){
-    const projectName = 'Pathshala App - Course Page';
-    return (
-        <>
-            <h1>Welcome to {projectName}</h1>
-        </>
-    )
+import CourseCatalog from "../component-global/CourseCatalog";
+
+export default function Course() {
+  return (
+    <CourseCatalog
+      title="Explore Courses"
+      description="Explore our published courses and filter by the category that fits your goals."
+      sectionClassName="bg-white"
+    />
+  );
 }
-export default Course;

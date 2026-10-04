@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../supabaseClient";
-import { getCourseErrorMessage } from "./courseErrors";
+import { getCourseErrorMessage, requireSignedInUser } from "./courseErrors";
 
 type CourseStatus = "Published" | "Draft" | "Archived";
 
@@ -20,15 +20,29 @@ interface Course {
   updatedAt: string;
 }
 
-async function fetchCourses(): Promise<{ courses: Course[]; error: string | null }> {
-  const { data, error } = await supabase
-    .from("courses")
-    .select("id, title, category, class_level, board, description, subjects, lessons, tests, students, status, updated_at")
-    .order("updated_at", { ascending: false });
+type CourseCategory = { name: string };
 
-  if (error) return { courses: [], error: getCourseErrorMessage(error) };
+async function fetchCourses(): Promise<{
+  courses: Course[];
+  categories: CourseCategory[];
+  error: string | null;
+}> {
+  const [courseResult, categoryResult] = await Promise.all([
+    supabase
+      .from("courses")
+      .select("id, title, category, class_level, board, description, subjects, lessons, tests, students, status, updated_at")
+      .order("updated_at", { ascending: false }),
+    supabase.from("course_categories").select("name").order("name"),
+  ]);
+
+  if (courseResult.error) {
+    return { courses: [], categories: [], error: getCourseErrorMessage(courseResult.error) };
+  }
+  if (categoryResult.error) {
+    return { courses: [], categories: [], error: getCourseErrorMessage(categoryResult.error) };
+  }
   return {
-    courses: data.map((course) => ({
+    courses: courseResult.data.map((course) => ({
       id: course.id,
       title: course.title,
       category: course.category,
@@ -42,12 +56,14 @@ async function fetchCourses(): Promise<{ courses: Course[]; error: string | null
       status: course.status,
       updatedAt: course.updated_at,
     })),
+    categories: categoryResult.data,
     error: null,
   };
 }
 
 const Courses = () => {
   const [courses, setCourses] = useState<Course[]>([]);
+  const [courseCategories, setCourseCategories] = useState<CourseCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -65,6 +81,7 @@ const Courses = () => {
       const result = await fetchCourses();
       if (!active) return;
       setCourses(result.courses);
+      setCourseCategories(result.categories);
       setError(result.error ?? "");
       setLoading(false);
     };
@@ -79,6 +96,7 @@ const Courses = () => {
     setError("");
     const result = await fetchCourses();
     setCourses(result.courses);
+    setCourseCategories(result.categories);
     setError(result.error ?? "");
     setLoading(false);
   };
@@ -91,8 +109,7 @@ const Courses = () => {
     return matchesSearch && matchesStatus && matchesCategory;
   });
 
-  // Unique Categories
-  const categories = ["all", ...Array.from(new Set(courses.map((c) => c.category)))];
+  const categories = ["all", ...courseCategories.map((category) => category.name)];
 
   // Select All / Individual
   const toggleSelectAll = () => {
@@ -120,6 +137,12 @@ const Courses = () => {
   const handleDelete = async (id: string) => {
     setDeleting(true);
     setError("");
+    const authError = await requireSignedInUser();
+    if (authError) {
+      setError(authError);
+      setDeleting(false);
+      return;
+    }
     const { error: deleteError } = await supabase.from("courses").delete().eq("id", id);
     if (deleteError) {
       setError(getCourseErrorMessage(deleteError));
@@ -136,6 +159,12 @@ const Courses = () => {
   const handleBulkDelete = async () => {
     setDeleting(true);
     setError("");
+    const authError = await requireSignedInUser();
+    if (authError) {
+      setError(authError);
+      setDeleting(false);
+      return;
+    }
     const { error: deleteError } = await supabase
       .from("courses")
       .delete()
@@ -175,6 +204,12 @@ const Courses = () => {
             Manage all courses, lessons, and tests from here.
           </p> */}
         </div>
+        {/* <Link
+          to="/admin/course-categories"
+          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 font-bold text-brandDark transition hover:border-brandTeal hover:text-brandTeal"
+        >
+          Manage Categories
+        </Link> */}
         <Link
           to="/admin/courses/add"
           className="inline-flex items-center gap-2 bg-brandTeal hover:bg-teal-700 text-white font-bold px-5 py-3 rounded-xl shadow-md transition transform hover:-translate-y-0.5"
@@ -427,6 +462,14 @@ const Courses = () => {
                   {/* Actions */}
                   <td className="px-4 md:px-6 py-4">
                     <div className="flex items-center justify-end gap-1">
+                      <Link
+                        to={`/admin/courses/${course.id}/lessons`}
+                        className="rounded-lg px-2 py-2 text-xs font-bold text-brandTeal transition hover:bg-teal-50"
+                        title="Manage lessons"
+                      >
+                        Lessons
+                      </Link>
+
                       {/* View */}
                       <button
                         className="p-2 rounded-lg text-slate-500 hover:bg-blue-50 hover:text-blue-600 transition"
